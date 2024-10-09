@@ -5,10 +5,12 @@ import Navbar from "./components/Navbar";
 import Home from "./components/Home";
 // import About from "./components/About";
 // import Login from "./components/Login";
-// import Signup from "./components/Signup";
+
 //import ForgotPassword from "./components/ForgotPassword"; // Import ForgotPassword component
 import Footer from "./components/Footer";
 import "./App.css";
+import Signup from "./components/Signup";
+
 
 function App() {
   return (
@@ -18,6 +20,7 @@ function App() {
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/signup" element={<Signup />} />
             {/* <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
             <Route path="/login" element={<Login />} />
