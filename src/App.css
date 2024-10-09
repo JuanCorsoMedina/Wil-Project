@@ -1,0 +1,173 @@
+/* src/App.css */
+
+/* General styling */
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: "Arial", sans-serif;
+  background-color: #f8f9fa; /* Light gray background */
+}
+
+.App {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  width: 100%;
+}
+
+/* Navbar */
+.navbar {
+  background-color: #333333; /* Dark gray for navbar */
+  height: 60px; /* Fixed height */
+  display: flex;
+  align-items: center;
+}
+
+.navbar-brand,
+.nav-link {
+  color: #f8f9fa !important; /* Light gray for contrast */
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+  color: #6c757d !important; /* Medium gray on hover */
+}
+
+/* Footer */
+.footer {
+  background-color: #333333;
+  color: #f8f9fa;
+  height: 60px; /* Fixed height to match navbar */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Links in the footer */
+.footer a {
+  color: #f8f9fa;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.footer a:hover {
+  color: #6c757d;
+}
+
+/* Hero section for the Home page */
+.hero-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #6c757d; /* Medium gray background */
+  color: #f8f9fa; /* Light gray text */
+  flex: 1; /* Expand to fill the available space */
+  width: 100%;
+}
+
+.hero-content {
+  text-align: center;
+  padding: 20px;
+}
+
+.hero-section h1 {
+  font-size: 2.5rem;
+  font-weight: bold;
+}
+
+.hero-section p {
+  font-size: 1.2rem;
+}
+
+/* Buttons */
+.btn-accent {
+  background-color: #333333;
+  border: none;
+  color: white;
+  transition: background-color 0.3s ease;
+}
+
+.btn-accent:hover {
+  background-color: #555555;
+}
+
+.btn-outline-light {
+  border-color: #f8f9fa;
+  color: #f8f9fa;
+  transition: background-color 0.3s ease;
+}
+
+.btn-outline-light:hover {
+  background-color: #f8f9fa;
+  color: #333333;
+}
+
+/* About Us styling */
+.about-section {
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 2rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.about-section h2 {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #333333; /* Dark gray text */
+}
+
+.about-section p,
+.about-section li {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #555555; /* Medium gray text */
+}
+
+.about-section ul {
+  list-style-type: disc;
+  padding-left: 20px;
+}
+
+/* Fade-in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Apply to hero content */
+.hero-content {
+  animation: fadeIn 1.5s ease-in-out;
+}
+
+/* Adjust font size for smaller screens */
+@media (max-width: 768px) {
+  .hero-section h1 {
+    font-size: 2rem;
+  }
+
+  .hero-section p {
+    font-size: 1rem;
+  }
+}
+
+/* Additional styling for social media links */
+.about-section a:hover {
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+/* src/App.css */
+.no-underline {
+  text-decoration: none;
+}
