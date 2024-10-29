@@ -2,11 +2,13 @@ from flask import Blueprint, request, jsonify, url_for
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from flask_mysqldb import MySQL
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename  # Add this import statement
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from flask_mail import Mail, Message  # For sending emails
 from app import mysql, mail  # Assumes mail instance `mail` is initialized
 import datetime
 import random
+import os
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -45,15 +47,16 @@ def login():
     password = data.get('password')
 
     cursor = mysql.connection.cursor()
-    cursor.execute("SELECT username, password, role FROM users WHERE username = %s", (username,))
+    cursor.execute("SELECT id, username, password, role FROM users WHERE username = %s", (username,))
     user = cursor.fetchone()
     cursor.close()
 
-    if not user or not check_password_hash(user[1], password):
+    if not user or not check_password_hash(user[2], password):
         return jsonify({"message": "Invalid credentials"}), 401
 
-    access_token = create_access_token(identity={'username': user[0], 'role': user[2]})
+    access_token = create_access_token(identity={'user_id': user[0], 'username': user[1], 'role': user[3]})
     return jsonify(access_token=access_token), 200
+
 
 @auth_bp.route('/forgot-password', methods=['POST'])
 def forgot_password():
@@ -198,6 +201,100 @@ def update_profile():
     cursor.close()
 
     return jsonify({'message': 'Profile updated successfully'}), 200
+
+@auth_bp.route('/add-user', methods=['POST'])
+@jwt_required()
+def add_user():
+    current_user = get_jwt_identity()  # Get the current logged-in user's identity (username or email)
+    user_name = request.form.get('user_name')
+    role = request.form.get('role')
+    image = request.files.get('image')
+
+    if not user_name or not role or not image:
+        return jsonify({"message": "All fields are required"}), 400
+
+    # Generate a secure filename and define the image path
+    filename = secure_filename(image.filename)
+    image_path = os.path.join('static/uploads', filename)
+    image.save(image_path)
+
+    # Associate the added user with the logged-in user
+    cursor = mysql.connection.cursor()
+    cursor.execute(
+        "INSERT INTO user_roles (user_name, role, image_path, added_by) VALUES (%s, %s, %s, %s)", 
+        (user_name, role, image_path, current_user['username'])
+    )
+    mysql.connection.commit()
+    cursor.close()
+
+    return jsonify({"message": "User added successfully"}), 201
+
+
+@auth_bp.route('/users', methods=['GET'])
+@jwt_required()
+def get_users():
+    try:
+        current_user = get_jwt_identity()  # Get the identity of the currently logged-in user
+        cursor = mysql.connection.cursor()
+        # Fetch id, user_name, role, and image_path from the user_roles table where added_by matches the current user
+        cursor.execute(
+            "SELECT id, user_name, role, image_path FROM user_roles WHERE added_by = %s", 
+            (current_user['username'],)
+        )
+        users = cursor.fetchall()
+        cursor.close()
+
+        users_list = []
+        for user in users:
+            users_list.append({
+                "id": user[0],
+                "user_name": user[1],
+                "role": user[2],
+                "image_path": user[3]  # Include image path in the response
+            })
+        
+        return jsonify({"users": users_list}), 200
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        return jsonify({"message": "Failed to fetch users"}), 500
+
+    
+@auth_bp.route('/delete-user/<int:user_id>', methods=['DELETE'])
+@jwt_required()
+def delete_user(user_id):
+    try:
+        cursor = mysql.connection.cursor()
+        # Delete the user with the given user_id
+        cursor.execute("DELETE FROM user_roles WHERE id = %s", (user_id,))
+        mysql.connection.commit()
+        cursor.close()
+        return jsonify({"message": "User deleted successfully"}), 200
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        return jsonify({"message": "Failed to delete user"}), 500
+    
+@auth_bp.route('/edit-user/<int:user_id>', methods=['PUT'])
+@jwt_required()  # Ensure JWT token is required for this route
+def edit_user(user_id):
+    data = request.get_json()
+    new_role = data.get('role')
+
+    if not new_role:
+        return jsonify({"message": "Role is required"}), 400
+
+    try:
+        cursor = mysql.connection.cursor()
+        # Update the user's role in the database
+        cursor.execute("UPDATE user_roles SET role = %s WHERE id = %s", (new_role, user_id))
+        mysql.connection.commit()
+        cursor.close()
+
+        return jsonify({"message": "User role updated successfully."}), 200
+
+    except Exception as e:
+        print(f"Error editing user role: {e}")
+        return jsonify({"message": "Failed to update user role. Please try again."}), 500
+
 
 @auth_bp.route('/protected', methods=['GET'])
 @jwt_required()
