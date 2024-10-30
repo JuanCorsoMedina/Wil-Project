@@ -204,6 +204,11 @@ def update_profile():
 
 @auth_bp.route('/add-user', methods=['POST'])
 @jwt_required()
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 def add_user():
     current_user = get_jwt_identity()  # Get the current logged-in user's identity (username or email)
     user_name = request.form.get('user_name')
@@ -212,6 +217,9 @@ def add_user():
 
     if not user_name or not role or not image:
         return jsonify({"message": "All fields are required"}), 400
+
+    if not allowed_file(image.filename):
+        return jsonify({"message": "Invalid file type"}), 400
 
     # Generate a secure filename and define the image path
     filename = secure_filename(image.filename)
