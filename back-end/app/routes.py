@@ -303,6 +303,52 @@ def edit_user(user_id):
         print(f"Error editing user role: {e}")
         return jsonify({"message": "Failed to update user role. Please try again."}), 500
 
+# Helper function to fetch stored faces from the database
+def get_stored_faces():
+    """Fetch user images and roles from the database for face recognition using OpenCV."""
+    cursor = mysql.connection.cursor()
+    cursor.execute("SELECT image_path, role FROM user_roles")
+    stored_faces = cursor.fetchall()
+    cursor.close()
+
+    known_faces = []
+    known_face_roles = []
+
+    for face in stored_faces:
+        image_path = face[0]
+        role = face[1]
+
+        # Load each image using OpenCV
+        try:
+            image = cv2.imread(image_path)
+            if image is not None:
+                known_faces.append(image)  # Store the image for comparison
+                known_face_roles.append(role)
+            else:
+                logging.error(f"Failed to load image: {image_path}. File might be missing or corrupted.")
+        except cv2.error as e:
+            logging.error(f"OpenCV error processing image {image_path}: {e}")
+        except Exception as e:
+            logging.error(f"Unexpected error processing image {image_path}: {e}")
+
+    return known_faces, known_face_roles
+
+@socketio.on('start_live_detection')
+def handle_start_detection():
+    print("Starting live detection.")
+    global camera_active
+    if not camera_active:
+        # Get the current Flask app instance context correctly using current_app
+        detection_thread = Thread(target=start_live_detection, args=(current_app._get_current_object(),))
+        detection_thread.start()
+
+@socketio.on('stop_live_detection')
+def handle_stop_detection():
+    print("Stopping live detection.")
+    global camera_active
+    camera_active = False
+    socketio.emit('stop_detection')
+    
 
 @auth_bp.route('/protected', methods=['GET'])
 @jwt_required()
