@@ -27,6 +27,8 @@ def create_app():
     # Initialize MySQL and JWT
     mysql.init_app(app)
     jwt = JWTManager(app)
+    mail.init_app(app)
+    socketio.init_app(app, cors_allowed_origins="*")  # Initialize Socket.IO with the app
     
     # Initialize Mail
     mail.init_app(app)
@@ -46,3 +48,7 @@ def create_app():
     app.register_blueprint(auth_bp)
 
     return app
+
+def run_socketio(app):
+    """Function to run Socket.IO server separately if needed."""
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)  # Adjust host/port as needed

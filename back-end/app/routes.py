@@ -333,6 +333,71 @@ def get_stored_faces():
 
     return known_faces, known_face_roles
 
+# Start live detection (runs in a separate thread)
+def start_live_detection(app):
+    global camera_active, last_detected_role
+
+    with app.app_context():  # Ensure the app context is active
+        camera_active = True
+
+        camera = cv2.VideoCapture(0)
+        if not camera.isOpened():
+            print("Could not start camera.")
+            return
+
+        # Load the Haar Cascade model for face detection
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        known_faces, known_face_roles = get_stored_faces()
+
+        while camera_active:
+            ret, frame = camera.read()
+            if not ret:
+                print("Failed to read from the camera.")
+                break
+
+            # Convert the frame to grayscale for face detection
+            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray_frame, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+
+            detected_roles = []
+
+            for (x, y, w, h) in faces:
+                detected_face = frame[y:y + h, x:x + w]
+
+                match_found = False
+                for idx, known_face in enumerate(known_faces):
+                    resized_known_face = cv2.resize(known_face, (w, h))
+
+                    # Calculate the histogram for both images
+                    hist_detected = cv2.calcHist([detected_face], [0], None, [256], [0, 256])
+                    hist_known = cv2.calcHist([resized_known_face], [0], None, [256], [0, 256])
+
+                    # Normalize histograms and compare them using correlation
+                    cv2.normalize(hist_detected, hist_detected, 0, 1, cv2.NORM_MINMAX)
+                    cv2.normalize(hist_known, hist_known, 0, 1, cv2.NORM_MINMAX)
+                    correlation = cv2.compareHist(hist_detected, hist_known, cv2.HISTCMP_CORREL)
+
+                    if correlation > 0.7:  # Adjust this threshold based on testing
+                        detected_roles.append(known_face_roles[idx])
+                        match_found = True
+                        break
+
+                if not match_found:
+                    detected_roles.append("Unauthorized")
+
+            # Update the global variable with the last detected role(s)
+            last_detected_role = detected_roles
+
+            # Encode the frame as JPEG and send it to the frontend as base64
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame_base64 = base64.b64encode(buffer).decode('utf-8')
+            socketio.emit('video_frame', {'frame': frame_base64, 'roles': detected_roles})
+
+            socketio.sleep(0.05)  # Adjust the frame rate as needed (lower this to reduce CPU load)
+
+        camera.release()
+        print("Camera released. Live detection ended.")
+
 @socketio.on('start_live_detection')
 def handle_start_detection():
     print("Starting live detection.")
