@@ -325,9 +325,11 @@ def get_stored_faces():
                 known_faces.append(image)  # Store the image for comparison
                 known_face_roles.append(role)
             else:
-                print(f"Error loading image {image_path}: Image is None")
+                logging.error(f"Failed to load image: {image_path}. File might be missing or corrupted.")
+        except cv2.error as e:
+            logging.error(f"OpenCV error processing image {image_path}: {e}")
         except Exception as e:
-            print(f"Error processing image {image_path}: {e}")
+            logging.error(f"Unexpected error processing image {image_path}: {e}")
 
     return known_faces, known_face_roles
 
