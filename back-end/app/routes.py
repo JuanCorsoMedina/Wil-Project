@@ -436,6 +436,25 @@ def send_email_alert(body, frame):
         print("Email alert sent successfully!")
     except Exception as e:
         print(f"Failed to send email alert: {e}")
+        
+def send_sms_alert(message_body):
+    """Send an SMS alert for unauthorized detection."""
+    account_sid = current_app.config['TWILIO_ACCOUNT_SID']
+    auth_token = current_app.config['TWILIO_AUTH_TOKEN']
+    twilio_number = current_app.config['TWILIO_PHONE_NUMBER']
+    recipient_number = current_app.config['ALERT_PHONE_NUMBER']
+
+    client = Client(account_sid, auth_token)
+
+    try:
+        message = client.messages.create(
+            body=message_body,
+            from_=twilio_number,
+            to=recipient_number
+        )
+        print(f"SMS alert sent successfully: {message.sid}")
+    except Exception as e:
+        print(f"Failed to send SMS alert: {e}")
 
 @auth_bp.route('/protected', methods=['GET'])
 @jwt_required()
