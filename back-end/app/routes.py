@@ -414,6 +414,28 @@ def handle_stop_detection():
     camera_active = False
     socketio.emit('stop_detection')
     
+def send_alerts(role, frame):
+    """Send email alert."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S") 
+    send_sms_alert("Unauthorized face detected at " + timestamp)
+
+
+def send_email_alert(body, frame):
+    try:
+        msg = Message(
+            subject="Alert: Unauthorized Face Detected",
+            recipients=["xyx@gmail.com"] 
+        )
+        msg.body = body
+
+        # Attach the frame image
+        ret, buffer = cv2.imencode('.jpg', frame)
+        msg.attach("detected_face.jpg", "image/jpeg", buffer.tobytes())
+
+        mail.send(msg)
+        print("Email alert sent successfully!")
+    except Exception as e:
+        print(f"Failed to send email alert: {e}")
 
 @auth_bp.route('/protected', methods=['GET'])
 @jwt_required()
