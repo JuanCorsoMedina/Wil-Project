@@ -545,6 +545,101 @@ def get_logs_from_database(page, sort, start_date=None, end_date=None):
     except Exception as e:
         print(f"Error retrieving access logs: {e}")
         raise
+    
+# Updated route
+@auth_bp.route('/access-logs', methods=['GET'])
+@jwt_required()
+def access_logs():
+    page = request.args.get('page', default=1, type=int)
+    sort = request.args.get('sort', default='timestamp', type=str)
+    start_date = request.args.get('startDate')
+    end_date = request.args.get('endDate')
+
+    try:
+        logs, total_logs = get_logs_from_database(page, sort, start_date, end_date)
+        return jsonify({'logs': logs, 'totalLogs': total_logs}), 200
+    except Exception as e:
+        print(f"Error retrieving access logs: {e}")
+        return jsonify({'message': 'Failed to retrieve access logs'}), 500
+
+@auth_bp.route('/generate-report', methods=['GET'])
+@jwt_required()
+def generate_report():
+    report_type = request.args.get('type', 'all')  # 'authorized', 'unauthorized', or 'all'
+    start_date = request.args.get('startDate')
+    end_date = request.args.get('endDate')
+
+    # Validate inputs
+    if not start_date or not end_date:
+        return jsonify({'message': 'Start and end dates are required'}), 400
+
+    # Extend end_date to include the entire day
+    end_date = (datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Generate a cache key based on the report parameters
+    cache_key = f"report:{report_type}:{start_date}:{end_date}"
+
+    # Check Redis cache
+    cached_report = cache.get(cache_key)
+    if cached_report:
+        return jsonify({'report': json.loads(cached_report), 'source': 'cache'}), 200
+
+    # If not cached, fetch from database
+    query = """
+        SELECT 
+            user_roles.user_name, 
+            user_roles.role, 
+            access_logs.action, 
+            access_logs.timestamp
+        FROM access_logs
+        LEFT JOIN user_roles ON access_logs.user_id = user_roles.user_id
+        WHERE access_logs.timestamp >= %s AND access_logs.timestamp < %s
+    """
+    params = [start_date, end_date]
+
+    # Filter by type
+    if report_type == 'authorized':
+        query += " AND access_logs.action = 'Authorized Access'"
+    elif report_type == 'unauthorized':
+        query += " AND access_logs.action = 'Unauthorized Access'"
+
+    query += " ORDER BY access_logs.timestamp DESC"
+
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute(query, params)
+        report_data = cursor.fetchall()
+        cursor.close()
+
+        # Format report data
+        formatted_report = [
+            {
+                'user_name': entry[0] or 'Unknown',
+                'role': entry[1] or 'N/A',
+                'action': entry[2],
+                'timestamp': entry[3].strftime('%Y-%m-%d %H:%M:%S'),
+            }
+            for entry in report_data
+        ]
+
+        # Cache the report for 10 minutes
+        cache.set(cache_key, json.dumps(formatted_report), ex=600)
+
+        return jsonify({'report': formatted_report, 'source': 'database'}), 200
+
+    except Exception as e:
+        print(f"Error generating report: {e}")
+        return jsonify({'message': 'Failed to generate report'}), 500
+
+@auth_bp.route('/reset-report-cache', methods=['POST'])
+@jwt_required()
+def reset_report_cache():
+    # Clear all keys related to reports
+    keys = cache.keys("report:*")
+    for key in keys:
+        cache.delete(key)
+
+    return jsonify({'message': 'Report cache cleared'}), 200
 
 @auth_bp.route('/protected', methods=['GET'])
 @jwt_required()
