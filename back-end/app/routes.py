@@ -456,6 +456,96 @@ def send_sms_alert(message_body):
     except Exception as e:
         print(f"Failed to send SMS alert: {e}")
 
+def log_access(user_id, action):
+    """
+    Logs an access attempt into the database.
+    """
+    cursor = mysql.connection.cursor()
+
+    # Check if the provided user_id exists in the users table
+    if user_id:
+        cursor.execute("SELECT id FROM user_roles WHERE user_id = %s", (user_id,))
+        result = cursor.fetchone()
+        if not result:
+            print(f"User ID {user_id} does not exist in the user_roles table.")
+            return  # Avoid inserting a log with an invalid user_id
+
+    # Insert the log entry with the correct user_id
+    query = "INSERT INTO access_logs (user_id, action, timestamp) VALUES (%s, %s, NOW())"
+    cursor.execute(query, (user_id, action))
+    mysql.connection.commit()
+    cursor.close()
+
+
+# Enhanced function to get logs from database with JOIN
+def get_logs_from_database(page, sort, start_date=None, end_date=None):
+    logs_per_page = 10
+    offset = (page - 1) * logs_per_page
+    sort_column = 'access_logs.timestamp' if sort == 'timestamp' else 'user_roles.user_name'
+
+    # Extend end_date to include the entire day
+    if end_date:
+        end_date = (datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Build the query
+    base_query = """
+        SELECT 
+            user_roles.id AS role_id, 
+            user_roles.user_name, 
+            user_roles.role, 
+            access_logs.id AS log_id, 
+            access_logs.action, 
+            access_logs.timestamp
+        FROM access_logs
+        LEFT JOIN user_roles ON access_logs.user_id = user_roles.user_id
+    """
+    count_query = "SELECT COUNT(*) FROM access_logs LEFT JOIN user_roles ON access_logs.user_id = user_roles.user_id"
+
+    params = []
+    date_filter = ""
+
+    # Apply date range filtering
+    if start_date and end_date:
+        date_filter = " WHERE access_logs.timestamp >= %s AND access_logs.timestamp < %s"
+        params.extend([start_date, end_date])
+
+    # Combine filtering with queries
+    query_logs = f"{base_query} {date_filter} ORDER BY {sort_column} DESC LIMIT %s OFFSET %s"
+    query_count = f"{count_query} {date_filter}"
+    params_logs = params + [logs_per_page, offset]
+
+    try:
+        cursor = mysql.connection.cursor()
+
+        # Fetch logs
+        cursor.execute(query_logs, params_logs)
+        logs = cursor.fetchall()
+
+        # Fetch total log count
+        cursor.execute(query_count, params)
+        total_logs = cursor.fetchone()[0]
+
+        cursor.close()
+
+        # Format logs
+        formatted_logs = [
+            {
+                'role_id': log[0],
+                'user_name': log[1] or 'Unknown',
+                'role': log[2] or 'N/A',
+                'log_id': log[3],
+                'action': log[4] or 'Unauthorized Access',
+                'timestamp': log[5].strftime('%Y-%m-%d %H:%M:%S'),
+            }
+            for log in logs
+        ]
+
+        return formatted_logs, total_logs
+
+    except Exception as e:
+        print(f"Error retrieving access logs: {e}")
+        raise
+
 @auth_bp.route('/protected', methods=['GET'])
 @jwt_required()
 def protected():
